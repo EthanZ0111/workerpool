@@ -97,15 +97,19 @@ type LWorkerPool struct {
 	cancleFunc    context.CancelFunc
 	workQuatoChan chan struct{}
 	cancleChan    chan struct{}
+	maxPoolSize   int
 }
 
 //NewLWorkerPool : isNeedResort means cache will resort wait cache with level and wait time, it will be
 // inefficiency if there is too many worker is waiting.
-func NewLWorkerPool(maxConcurrent int, isNeedResort bool) *LWorkerPool {
+func NewLWorkerPool(maxConcurrent, maxPoolSize int, isNeedResort bool) *LWorkerPool {
 	qc := make(chan struct{}, maxConcurrent)
 	cc, cf := context.WithCancel(context.Background())
 	for i := 0; i < maxConcurrent; i++ {
 		qc <- struct{}{}
+	}
+	if maxPoolSize == 0 {
+		maxPoolSize = 10000
 	}
 	wp := &LWorkerPool{
 		waitPool:      newCacheList(isNeedResort),
@@ -115,6 +119,7 @@ func NewLWorkerPool(maxConcurrent int, isNeedResort bool) *LWorkerPool {
 		workQuatoChan: qc,
 		indexLock:     new(sync.RWMutex),
 		cancleChan:    make(chan struct{}, 1),
+		maxPoolSize:   maxPoolSize,
 	}
 	go wp.loop()
 	return wp
@@ -186,6 +191,9 @@ func (p *LWorkerPool) SignInWork(w Worker) (*WorkerStatus, error) {
 	status := p.GetWorkStatus(w.GetWorkerID())
 	if status.WorkStatus != NotExist {
 		return &status, fmt.Errorf("Work is exist")
+	}
+	if len(p.workerIndex) >= p.maxPoolSize {
+		return nil, fmt.Errorf("Too many wait worker %d", len(p.workerIndex))
 	}
 	p.workerIndex[w.GetWorkerID()] = wn
 	// p.waitPoolIndex[]

@@ -47,9 +47,9 @@ func (tw *TestWorker) GetLevel() int {
 }
 
 func TestWorkerPool(t *testing.T) {
-	wp := NewLWorkerPool(1, false)
+	wp := NewLWorkerPool(10, 1000, false)
 	rand.Seed(time.Now().Unix())
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 1000; i++ {
 		w := NewTestWorker(strconv.Itoa(i), rand.Intn(4)+1, i)
 		wp.SignInWork(w)
 	}
